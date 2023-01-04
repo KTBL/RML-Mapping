@@ -1,0 +1,1293 @@
+#### BufferConstraints
+# Author: Dr.-Ing. Katharina Albrecht
+# Date: 2022-07-05
+# Version: 1.0
+# Change: adaption to mapping by rmlmapper
+######################################
+
+@prefix rr: <http://www.w3.org/ns/r2rml#>.
+@prefix rml: <http://semweb.mmlab.be/ns/rml#>.
+@prefix ql: <http://semweb.mmlab.be/ns/ql#>.
+@prefix transit: <http://vocab.org/transit/terms/>.
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+@base <http://example.com/ns#>.
+@prefix psm: <http://srv.ktbl.de/data/psm/>.
+@prefix psmr: <http://srv.ktbl.de/data/psm/resources/>.
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix unit: <http://qudt.org/vocab/unit#>.
+@prefix qudt: <http://qudt.org/schema/qudt/>.
+
+@prefix d2rq : <http://www.wiwiss.fu-berlin.de/suhl/bizer/D2RQ/0.1#> .
+<#DB_source> a d2rq:Database;
+    d2rq:jdbcDSN "jdbc:sqlite:PathToDB";
+    d2rq:jdbcDriver "org.sqlite.JDBC";
+    d2rq:username "";
+	d2rq:password "".
+
+## General mapping of indication with plantheight
+
+	
+<#TriplesMapAWG> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AWG_ID, KENNR, REPLACE(AWG_ID, "/", "-") AS URLID FROM AWG """
+	]; 
+    rr:subjectMap [
+        rr:template "http://srv.ktbl.de/data/psm/resources/ind_{URLID}";
+        rr:class psm:Indication;
+    ];
+	rr:predicateObjectMap [
+        rr:predicate rdfs:label;
+        rr:objectMap [ rml:reference "AWG_ID" ];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:considerBufferConstraint;
+		rr:objectMap [ rr:parentTriplesMap <#DistanceConstraintMapV>;
+				rr:joinCondition [
+				rr:child "AWG_ID";
+				rr:parent "EBENE";
+			];
+		];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:considerBufferConstraint;
+		rr:objectMap [ rr:parentTriplesMap <#DistanceConstraintMap>;
+				rr:joinCondition [
+				rr:child "AWG_ID";
+				rr:parent "EBENE";
+			];
+		];
+	].
+	
+
+## Mapping of BufferCollectionNode without plant height
+
+<#DistanceConstraintMapV> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AUFLAGENR, EBENE  FROM AUFLAGEN 
+WHERE ANWENDBEST = "J" AND WEITERE_BEDINGUNG IS NULL """
+	]; 
+	rr:subjectMap [
+        rr:template "BufferCollectionNode{EBENE}";
+        rr:termType rr:BlankNode;
+    ];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:BufferCollection;
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferCategory;
+		rr:objectMap [ rr:parentTriplesMap <#waterConstraintMap>;
+			rr:joinCondition [
+				rr:child "EBENE";
+				rr:parent "EBENE";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferCategory;
+		rr:objectMap [ rr:parentTriplesMap <#waterConstraintMap2>;
+			rr:joinCondition [
+				rr:child "EBENE";
+				rr:parent "EBENE";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferCategory;
+		rr:objectMap [ rr:parentTriplesMap <#vegeConstraintMap2>;
+			rr:joinCondition [
+				rr:child "EBENE";
+				rr:parent "EBENE";
+			];
+			];
+    ];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferCategory;
+		rr:objectMap [ rr:parentTriplesMap <#UrbanConstraintMap2>;
+			rr:joinCondition [
+				rr:child "EBENE";
+				rr:parent "EBENE";
+			];
+			];
+	].	
+	
+	
+<#SizeConstraintMap> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AUFLAGENR, CASE WEITERE_BEDINGUNG WHEN "<50%" THEN "50" ELSE "125" END SIZE FROM AUFLAGEN 
+WHERE WEITERE_BEDINGUNG LIKE "<50%" OR WEITERE_BEDINGUNG LIKE "%-%" """
+	]; 
+	rr:subjectMap [ 
+		rr:template "additionalConstraints{SIZE}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{SIZE}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; 
+		rr:object unit:Centimeter;
+	].	
+	
+<#SizeConstraintMap2> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AUFLAGENR, CASE WEITERE_BEDINGUNG WHEN "%-%" THEN "50" WHEN ">50%" THEN "50" ELSE "125" END SIZE FROM AUFLAGEN 
+WHERE WEITERE_BEDINGUNG LIKE ">50%" OR WEITERE_BEDINGUNG LIKE ">125%"  OR WEITERE_BEDINGUNG LIKE "%-%" """
+	]; 
+	rr:subjectMap [ 
+		rr:template "additionalConstraints{SIZE}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{SIZE}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; 
+		rr:object unit:Centimeter;
+	].		
+
+	
+##  BufferCollectionNode with plant height	
+
+<#DistanceConstraintMap> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AUFLAGENR, EBENE, WEITERE_BEDINGUNG, CASE WEITERE_BEDINGUNG WHEN "%-%" THEN REPLACE(WEITERE_BEDINGUNG, "-", "") WHEN ">50%" THEN SUBSTRING(WEITERE_BEDINGUNG,2,2) ELSE SUBSTRING(WEITERE_BEDINGUNG, 2,3) END || REPLACE(EBENE,"/","-") as SIZEONE FROM AUFLAGEN
+WHERE ANWENDBEST = "J"  """
+	]; 
+	rr:subjectMap [
+        rr:template "BufferCollectionNode{SIZEONE}";
+        rr:termType rr:BlankNode;
+    ];
+	rr:predicateObjectMap [
+		rr:predicate rdf:type;
+		rr:object psm:BufferCollection;
+	];
+	rr:predicateObjectMap [
+		rr:predicate rdfs:label;
+		rr:objectMap [ rr:template "Abstandsauflagen für folgende Bereiche bei Pflanzenaufwuchshöhe von {WEITERE_BEDINGUNG}"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap [
+        rr:predicate psm:cropTallerThan;
+		rr:objectMap [ rr:parentTriplesMap <#SizeConstraintMap2>;
+				rr:joinCondition [
+				rr:child "AUFLAGENR";
+				rr:parent "AUFLAGENR";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+        rr:predicate psm:cropSmallerThan;
+		rr:objectMap [ rr:parentTriplesMap <#SizeConstraintMap>;
+				rr:joinCondition [
+				rr:child "AUFLAGENR";
+				rr:parent "AUFLAGENR";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferCategory;
+		rr:objectMap [ rr:parentTriplesMap <#waterConstraintMap>;
+			rr:joinCondition [
+				rr:child "EBENE";
+				rr:parent "EBENE";
+			];
+			rr:joinCondition [
+				rr:child "WEITERE_BEDINGUNG";
+				rr:parent "WEITERE_BEDINGUNG";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferCategory;
+		rr:objectMap [ rr:parentTriplesMap <#waterConstraintMap2>;
+			rr:joinCondition [
+				rr:child "EBENE";
+				rr:parent "EBENE";
+			];
+			rr:joinCondition [
+				rr:child "WEITERE_BEDINGUNG";
+				rr:parent "WEITERE_BEDINGUNG";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferCategory;
+		rr:objectMap [ rr:parentTriplesMap <#vegeConstraintMap2>;
+			rr:joinCondition [
+				rr:child "EBENE";
+				rr:parent "EBENE";
+			];
+			rr:joinCondition [
+				rr:child "WEITERE_BEDINGUNG";
+				rr:parent "WEITERE_BEDINGUNG";
+			];
+			];
+    ];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferCategory;
+		rr:objectMap [ rr:parentTriplesMap <#UrbanConstraintMap2>;
+			rr:joinCondition [
+				rr:child "EBENE";
+				rr:parent "EBENE";
+			];
+			rr:joinCondition [
+				rr:child "WEITERE_BEDINGUNG";
+				rr:parent "WEITERE_BEDINGUNG";
+			];
+			];
+
+].	
+	
+#### Vegetation
+
+# für die allg. Constraints nur noch "Constraint"
+<#vegeConstraintMap2> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT * FROM AUFLAGEN
+WHERE AUFLAGE LIKE ("NT104")OR AUFLAGE LIKE ("NT101")OR AUFLAGE LIKE ("NT102")OR AUFLAGE LIKE ("NT103") OR AUFLAGE LIKE ("NT105") OR AUFLAGE LIKE ("NT106") OR AUFLAGE LIKE ("NT107") OR AUFLAGE LIKE ("NT108") OR AUFLAGEN.AUFLAGE LIKE ("NT109") """
+	];
+	rr:subjectMap [ 
+		rr:template "VegetationConstraint{AUFLAGENR}";
+		rr:termType rr:BlankNode;
+		#rr:class psm:VegetationConstraint;
+	];
+#	rr:predicateObjectMap[
+#		rr:predicate rdfs:label;
+#		rr:objectMap [rr:constant "Vegetationbuffer"; rr:termType rr:Literal;];
+#	];	
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferConstraint;
+		rr:objectMap [ rr:parentTriplesMap <#KVZFalseMT>;
+				rr:joinCondition [
+				rr:child "AUFLAGE";
+				rr:parent "KODE";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferConstraint;
+		rr:objectMap [ rr:parentTriplesMap <#KVZFalseLT>;
+				rr:joinCondition [
+				rr:child "AUFLAGE";
+				rr:parent "KODE";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferConstraint;
+		rr:objectMap [ rr:parentTriplesMap <#KVZTrueLT>;
+				rr:joinCondition [
+				rr:child "AUFLAGE";
+				rr:parent "KODE";
+			];
+			];	
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:VegetationConstraint;
+	].
+	
+
+#### FOR VEGETATION with xx drift reduction
+<#KVZFalseMT> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE.KODE FROM KODE
+WHERE LOWER(KODE.KODETEXT) LIKE ('%Breite von mindestens%') AND NOT LOWER(KODE.KODETEXT) LIKE ("%bystander%")  """
+	]; 
+	rr:subjectMap [ 
+		rr:template "BufferConstraintNoKVZDrift{KODE}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:constant "more"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate psm:inKVZ;
+		rr:objectMap [rr:constant "false"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:BufferConstraint;
+	];	
+	rr:predicateObjectMap [
+		rr:predicate psm:drift;
+		rr:objectMap [ rr:parentTriplesMap <#Driftnode>;
+				rr:joinCondition [
+				rr:child "KODE";
+				rr:parent "KODE";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:buffer;
+		rr:objectMap [ rr:parentTriplesMap <#Buffernode>;
+				rr:joinCondition [
+				rr:child "KODE";
+				rr:parent "KODE";
+			];
+			];
+	].
+	
+	
+	
+	
+#### If no Drift reduction is available
+<#KVZFalseLT> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE.KODE FROM KODE
+WHERE LOWER(KODE.KODETEXT) LIKE ('%Breite von mindestens%') AND LOWER(KODE.KODETEXT) LIKE ('%5 m%') """
+	]; 
+	rr:subjectMap [ 
+		rr:template "BufferConstraintNoKVZ{KODE}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:constant "less"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:BufferConstraint;
+	];
+	rr:predicateObjectMap[
+		rr:predicate psm:inKVZ;
+		rr:objectMap [rr:constant "false"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:buffer;
+		rr:objectMap [ rr:parentTriplesMap <#Buffernode25>;
+				rr:joinCondition [
+				rr:child "KODE";
+				rr:parent "KODE";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:drift;
+		rr:objectMap [ rr:parentTriplesMap <#Driftnode>;
+				rr:joinCondition [
+				rr:child "KODE";
+				rr:parent "KODE";
+			];
+			];
+	].
+
+
+<#KVZTrueLT> a rr:TriplesMap;
+	rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE.KODE FROM KODE
+WHERE LOWER(KODE.KODETEXT) LIKE ('%Breite von mindestens%')AND KODE.KODETEXT LIKE ('%Kleinstrukturen%') """
+	]; 
+	rr:subjectMap [ 
+		rr:template "BufferConstraintKVZ{KODE}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:constant "less"; rr:termType rr:Literal;];
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:BufferConstraint;
+	];
+	rr:predicateObjectMap[
+		rr:predicate psm:inKVZ;
+		rr:objectMap [rr:constant "true"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:drift;
+		rr:objectMap [ rr:parentTriplesMap <#Driftnode>;
+				rr:joinCondition [
+				rr:child "KODE";
+				rr:parent "KODE";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:buffer;
+		rr:objectMap [ rr:parentTriplesMap <#Buffernode20>;
+			rr:joinCondition [
+			rr:child "KODE";
+			rr:parent "KODE";
+		];
+		];
+	].
+	
+	
+### DRIFT more and KVZ false
+<#Buffernode> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE, CASE KODETEXT WHEN '%5 m%' THEN "5" END BUFFER5 FROM KODE
+WHERE LOWER(KODETEXT) LIKE ('%Breite von mindestens%') AND LOWER(KODETEXT) LIKE ('%5 m%') """
+	]; 
+    rr:subjectMap [
+        rr:template "BufferNode{BUFFER5}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Buffer;
+	];	
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{BUFFER5}m"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{BUFFER5}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; 
+		rr:object unit:Meter;
+	].		
+
+### DRIFT less and KVZ false
+<#Buffernode25> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE, CASE KODETEXT WHEN '%5 m%' THEN "25" END BUFFER25 FROM KODE
+WHERE LOWER(KODETEXT) LIKE ('%Breite von mindestens%') AND LOWER(KODETEXT) LIKE ('%5 m%') """
+	]; 
+    rr:subjectMap [
+        rr:template "BufferNode{BUFFER25}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Buffer;
+	];	
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{BUFFER25}m"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{BUFFER25}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit;
+		rr:object unit:Meter;
+	].		
+
+### DRIFT less and KVZ false
+<#Buffernode20> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE, CASE KODETEXT WHEN '%Breite von mindestens%' THEN "20" END BUFFER20 FROM KODE
+WHERE LOWER(KODETEXT) LIKE ('%Breite von mindestens%') """
+	]; 
+    rr:subjectMap [
+        rr:template "BufferNode{BUFFER20}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Buffer;
+	];	
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{BUFFER20}m"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{BUFFER20}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit;
+		rr:object unit:Meter;
+	].	
+
+
+
+### WITH DRIFT	
+<#Driftnode> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """SELECT DISTINCT KODE, SUBSTRING(KODETEXT,INSTR(KODE.KODETEXT," %")-2,2) as PERCENTA FROM KODE
+WHERE KODETEXT LIKE ('%Breite von mindestens%') """
+	]; 
+    rr:subjectMap [
+        rr:template "DriftNode{PERCENTA}";
+        rr:termType rr:BlankNode;
+    ];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Drift;
+	];	
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{PERCENTA}%"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{PERCENTA}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; 
+		rr:object unit:Percent;
+	].	
+	
+<#Driftnode2> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """SELECT DISTINCT KODE, SUBSTRING(KODETEXT, INSTR(KODE.KODETEXT,"Breite von mindestens")+23,2) as BUFF FROM KODE
+WHERE KODETEXT LIKE ('%Breite von mindestens __%')  """
+	]; 
+    rr:subjectMap [
+        rr:template "RangeNode{BUFF}";
+		rr:termType rr:BlankNode;
+    ];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Range;
+	];		
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{BUFF}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{BUFF}m"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; #könnte man auch als rdf:comment machen
+		rr:object unit:Meter;
+	].	
+	
+	
+### WATER MAP
+<#waterConstraintMap> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AUFLAGEN.* FROM AUFLAGEN
+WHERE AUFLAGEN.ABSTAND > 0 OR AUFLAGEN.REDU_ABSTAND IS NOT NULL OR ((AUFLAGE LIKE "NW6%" OR AUFLAGE LIKE "NW70%" OR AUFLAGE = "NG402" OR AUFLAGE = "NG404" OR AUFLAGE = "NG412") AND ANWENDBEST = "J")  """
+	]; 
+	rr:subjectMap [ 
+		rr:template "WaterConstraint{AUFLAGENR}";
+		rr:termType rr:BlankNode;
+		#rr:class psm:WaterConstraint;
+	];
+#	rr:predicateObjectMap[
+#		rr:predicate rdfs:label;
+#		rr:objectMap [rr:constant "Waterbuffer"; rr:termType rr:Literal;];
+#	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:WaterConstraint;
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferConstraint;
+		rr:objectMap [ rr:parentTriplesMap <#ValueDriftmap>;
+				rr:joinCondition [
+				rr:child "AUFLAGENR";
+				rr:parent "AUFLAGENR";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferConstraint;
+		rr:objectMap [ rr:parentTriplesMap <#ValueRiskmap>;
+				rr:joinCondition [
+				rr:child "AUFLAGENR";
+				rr:parent "AUFLAGENR";
+			];
+			];	
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:toBeConsidered;
+		rr:objectMap [ rr:parentTriplesMap <#Value0amap>;
+				rr:joinCondition [
+				rr:child "AUFLAGE";
+				rr:parent "KODE";
+			];
+			];	
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferConstraint;
+		rr:objectMap [ rr:parentTriplesMap <#ValueSlopemap>;
+				rr:joinCondition [
+				rr:child "AUFLAGE";
+				rr:parent "KODE";
+			];
+			];	
+	].
+	
+#### EXTRA WATER MAP FOR ZERO DRIFT	
+<#waterConstraintMap2> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AUFLAGEN.* FROM AUFLAGEN
+WHERE AUFLAGEN.ABSTAND > 0 AND AUFLAGEN.REDU_ABSTAND IS NULL OR AUFLAGE LIKE "NW603"  """
+	]; 
+	rr:subjectMap [ 
+		rr:template "WaterConstraint{AUFLAGENR}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:WaterConstraint;
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferConstraint;
+		rr:objectMap [ rr:parentTriplesMap <#Value0map>;
+				rr:joinCondition [
+				rr:child "AUFLAGENR";
+				rr:parent "AUFLAGENR";
+			];
+			];	
+	].
+
+#### VALUE MAPS 50 75 and 90	
+<#ValueDriftmap> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AUFLAGE_REDU.*, REPLACE(KATEGORIE, "%", "") || AUFLAGENR as DRIFTINDEX, SUBSTR(KATEGORIE,1,2) as DRIFT FROM AUFLAGE_REDU
+WHERE KATEGORIE != "A" AND KATEGORIE != "B" AND KATEGORIE != "C" AND KATEGORIE != "D" """
+	]; 
+	rr:subjectMap [ 
+		rr:template "BufferConstraint{DRIFTINDEX}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:BufferConstraint;
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:drift;
+		rr:objectMap [ rr:parentTriplesMap <#TriplesMapDrift>;
+			rr:joinCondition [
+				rr:child "AUFLAGENR";
+				rr:parent "AUFLAGENR";
+			];
+			rr:joinCondition [
+				rr:child "KATEGORIE";
+				rr:parent "KATEGORIE";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:buffer;
+		rr:objectMap [ rr:parentTriplesMap <#TriplesMapBuffer>;
+			rr:joinCondition [
+				rr:child "AUFLAGENR";
+				rr:parent "AUFLAGENR";
+			];		
+				rr:joinCondition [
+				rr:child "REDU_ABSTAND";
+				rr:parent "REDU_ABSTAND";
+			];
+			];
+].
+
+### for A B C D
+<#ValueRiskmap> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AUFLAGE_REDU.*, REPLACE(KATEGORIE, "%", "") || AUFLAGENR as RISKINDEX,  SUBSTR(KATEGORIE,1,1) as RISK FROM AUFLAGE_REDU
+WHERE KATEGORIE NOT LIKE "7%" AND KATEGORIE NOT LIKE "9%" AND KATEGORIE NOT LIKE "5%" """
+	]; 
+	rr:subjectMap [ 
+		rr:template "BufferConstraint{RISKINDEX}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:BufferConstraint;
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:risk;
+		rr:objectMap [ rr:parentTriplesMap <#TriplesMapRisk>;
+			rr:joinCondition [
+				rr:child "AUFLAGENR";
+				rr:parent "AUFLAGENR";
+			];
+			rr:joinCondition [
+				rr:child "KATEGORIE";
+				rr:parent "KATEGORIE";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:buffer;
+		rr:objectMap [ rr:parentTriplesMap <#TriplesMapBuffer>;
+			rr:joinCondition [
+				rr:child "AUFLAGENR";
+				rr:parent "AUFLAGENR";
+			];		
+				rr:joinCondition [
+				rr:child "REDU_ABSTAND";
+				rr:parent "REDU_ABSTAND";
+			];
+			];
+	].	
+
+#### Buffer and drift of 50 75 90	
+<#TriplesMapDrift> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KATEGORIE, AUFLAGENR,
+	 CASE KATEGORIE WHEN "5%" THEN "50" WHEN "7%" THEN "75" ELSE "90" END DRIFTVALUE
+	FROM AUFLAGE_REDU
+WHERE KATEGORIE NOT LIKE "A" OR KATEGORIE NOT LIKE "B" OR KATEGORIE NOT LIKE "C" OR KATEGORIE NOT LIKE "D" """
+	]; 
+	rr:subjectMap [ 
+		rr:template "DriftNode{DRIFTVALUE}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Drift;
+	];		
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{DRIFTVALUE}%"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{DRIFTVALUE}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; 
+		rr:object unit:Percent;
+	].
+	
+#### Risikokategorie	
+<#TriplesMapRisk> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT SUBSTR(KATEGORIE,1,1) AS KAT
+	FROM AUFLAGE_REDU
+WHERE KATEGORIE NOT LIKE "7%" OR KATEGORIE NOT LIKE "9%" OR KATEGORIE NOT LIKE "5%" AND AUFLAGENR NOT LIKE "0" """
+	]; 
+	rr:subjectMap [ 
+		rr:template "RiskNode{KAT}";
+		rr:termType rr:BlankNode;
+
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Risk;
+	];		
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{KAT}"; rr:termType rr:Literal;];
+	].	
+	
+
+<#TriplesMapBuffer> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AUFLAGE_REDU.*, TRIM(REDU_ABSTAND) as ABSTANDE
+	FROM AUFLAGE_REDU """
+	]; 
+	rr:subjectMap [ 
+		rr:template "BufferNode{ABSTANDE}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Buffer;
+	];		
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{ABSTANDE} m"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{ABSTANDE}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; #könnte man auch als rdf:comment machen
+		rr:object unit:Meter;
+	].	
+	
+#### FOR ZERO DRIFT	
+<#Value0map> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AUFLAGEN.* FROM AUFLAGEN
+WHERE AUFLAGEN.ABSTAND > 0 """
+	]; 
+	rr:subjectMap [ 
+		rr:template "BufferValuesConstraints0{AUFLAGENR}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:BufferConstraint;
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:drift;
+		rr:objectMap [ rr:parentTriplesMap <#TriplesMapzero>;
+				rr:joinCondition [
+				rr:child "AUFLAGENR";
+				rr:parent "AUFLAGENR";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:buffer;
+		rr:objectMap [ rr:parentTriplesMap <#TriplesMapbufferzero>;
+				rr:joinCondition [
+				rr:child "AUFLAGENR";
+				rr:parent "AUFLAGENR";
+			];
+			];
+	].
+
+<#TriplesMapzero> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AUFLAGEN.*, 0 as DRIFTO FROM AUFLAGEN
+WHERE AUFLAGEN.ABSTAND > 0 """
+	];
+	rr:subjectMap [ 
+		rr:template "DriftNode{DRIFTO}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Drift;
+	];		
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{DRIFTO}%"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{DRIFTO}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; #könnte man auch als rdf:comment machen
+		rr:object unit:Percent;
+	].	
+	
+
+<#TriplesMapbufferzero> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AUFLAGEN.* FROM AUFLAGEN
+WHERE AUFLAGEN.ABSTAND >0 """
+	];
+	rr:subjectMap [ 
+		rr:template "BufferNode{ABSTAND}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{ABSTAND}m"; rr:termType rr:Literal;];
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Buffer;
+	];		
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{ABSTAND}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; 
+		rr:object unit:Meter;
+	].		
+	
+#### FOR ZERO DRIFT only inside TextField a "to be considered"
+
+<#Value0amap> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE.* FROM KODE
+WHERE KODE.KODELISTE = 74 AND (KODE.KODETEXT LIKE ('%in jedem Fall ist%') OR KODE.KODETEXT LIKE ('%Abschwemmung%') OR KODE.KODETEXT LIKE ('%Streuauflage%') OR KODE.KODETEXT LIKE ('%Wald%')) """
+	];
+	rr:subjectMap [ 
+		rr:template "http://srv.ktbl.de/data/pam/Constraint/{KODE}";
+		rr:class psm:Constraint;
+	].
+
+
+#### FOR SLOPE (only inside TextField)
+<#ValueSlopemap> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE.* FROM KODE
+WHERE KODE.KODELISTE = 74 AND (KODE.KODETEXT LIKE ('%Hangneigung%') )  AND (KODETEXT LIKE ('% m %')) """
+	];
+	rr:subjectMap [ 
+		rr:template "BufferConstraintSlope{KODE}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:BufferConstraint;
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:slope;
+		rr:objectMap [ rr:parentTriplesMap <#SlopeMap2>;
+				rr:joinCondition [
+				rr:child "KODE";
+				rr:parent "KODE";
+			];
+			];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:buffer;
+		rr:objectMap [ rr:parentTriplesMap <#SlopeMap1>;
+				rr:joinCondition [
+				rr:child "KODE";
+				rr:parent "KODE";
+			];
+			];
+	].
+
+<#SlopeMap1> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE.KODE, IIF(KODE.KODETEXT LIKE ('%5 m%'), "5", SUBSTRING(KODE.KODETEXT,INSTR(KODE.KODETEXT," m ")-2,2)) as ABSTAND 
+	FROM KODE
+WHERE KODE.KODELISTE = 74 AND (KODE.KODETEXT LIKE ('%Hangneigung%') ) AND (KODETEXT LIKE ('% m %')) """
+	];
+    rr:subjectMap [
+        rr:template "BufferNode{ABSTAND}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{ABSTAND}m"; rr:termType rr:Literal;];
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Buffer;
+	];		
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{ABSTAND}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; #könnte man auch als rdf:comment machen
+		rr:object unit:Meter;
+].		
+	
+<#SlopeMap2> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE,  CASE KODETEXT WHEN '%über 2%' THEN "2" ELSE "4" END SLOPES
+	FROM KODE
+WHERE KODELISTE = 74 AND KODETEXT LIKE ('%Hangneigung%')  """
+	];
+    rr:subjectMap [
+        rr:template "SlopeNode{SLOPES}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Slope;
+	];	
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{SLOPES}%"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{SLOPES}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; 
+		rr:object unit:Percent;
+	].	
+	
+
+
+#### Urban
+<#UrbanConstraintMap2> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AUFLAGEN.* FROM AUFLAGEN
+WHERE AUFLAGEN.AUFLAGE LIKE ("NT15%") """
+	];
+	rr:subjectMap [ 
+		rr:template "UrbanConstraint{AUFLAGENR}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:UrbanConstraint;
+	];
+	rr:predicateObjectMap [
+        rr:predicate psm:additionalConstraints;
+        rr:objectMap [ rml:reference "WEITERE_BEDINGUNG" ];	
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferConstraint;
+		rr:objectMap [ rr:parentTriplesMap <#UrbanmapBufferValues>;
+				rr:joinCondition [
+				rr:child "AUFLAGE";
+				rr:parent "KODE";
+			];
+			];	
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:bufferConstraint;
+		rr:objectMap [ rr:parentTriplesMap <#UrbanmapBufferValuesmix>;
+				rr:joinCondition [
+				rr:child "AUFLAGE";
+				rr:parent "KODE";
+			];
+			];
+	].
+	
+#### FOR URBAN NOMIX
+<#UrbanmapBufferValuesmix> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE FROM KODE
+WHERE KODETEXT LIKE ('%Kleingärten%') AND KODETEXT LIKE ('%Tankmischung%') """
+	];
+	rr:subjectMap [ 
+		rr:template "BufferConstraintNodeNoMix{KODE}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:BufferConstraint;
+	];
+	rr:predicateObjectMap[
+		rr:predicate psm:mixed;
+		rr:objectMap [rr:constant "false"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:buffer;
+		rr:objectMap [ rr:parentTriplesMap <#UrbanMapBuffer>;
+			rr:joinCondition [
+				rr:child "KODE";
+				rr:parent "KODE";
+			];
+			];
+	].
+	
+#### FOR URBAN MIX
+<#UrbanmapBufferValues> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE FROM KODE
+WHERE KODETEXT LIKE ('%Kleingärten%')  """
+	];
+	rr:subjectMap [ 
+		rr:template "BufferConstraintNodeMix{KODE}";
+		rr:termType rr:BlankNode;
+		
+	];
+	rr:predicateObjectMap[
+		rr:predicate psm:mixed;
+		rr:objectMap [rr:constant "true"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:BufferConstraint;
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:buffer;
+		rr:objectMap [ rr:parentTriplesMap <#UrbanMapBuffer2>;
+						rr:joinCondition [
+				rr:child "KODE";
+				rr:parent "KODE";
+			];
+			];
+	];
+		rr:predicateObjectMap [
+		rr:predicate psm:bufferRemainingAreas;
+		rr:objectMap [ rr:parentTriplesMap <#UrbanMapBufferRemainingAreas>;
+			rr:joinCondition [
+				rr:child "KODE";
+				rr:parent "KODE";
+			];
+		];
+
+	].
+	
+<#UrbanmapBufferMixEx> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT * FROM AUFLAGEN
+WHERE AUFLAGE = "NT154" OR AUFLAGE = "NT155"  """
+	];
+	rr:subjectMap [ 
+		rr:template "UrbanConstraint{AUFLAGENR}";
+		rr:termType rr:BlankNode;
+		#rr:class psm:UrbanConstraint;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:UrbanConstraint		
+	];		
+		rr:predicateObjectMap[
+		rr:predicate psm:exception;
+		rr:objectMap [rr:template "http://srv.ktbl.de/data/psm/resources/cons_{AUFLAGE}"; rr:termType rr:IRI];
+	].
+	
+### Nonmixed
+<#UrbanMapBuffer> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE, CASE KODE WHEN "NT154" THEN 20 END BUFFER20 FROM KODE
+WHERE KODE = "NT154"  """
+	];
+    rr:subjectMap [
+        rr:template "BufferNode{BUFFER20}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Buffer;
+	];	
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{BUFFER20}m"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{BUFFER20}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; 
+		rr:object unit:Meter;
+	].	
+
+#Mixed
+<#UrbanMapBuffer2> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE, CASE KODETEXT WHEN "%100%" THEN 100 ELSE 50 END DIST FROM KODE
+WHERE KODE LIKE "NT15%"  """
+	];
+    rr:subjectMap [
+        rr:template "BufferNode{DIST}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Buffer;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{DIST}m"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{DIST}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; 
+		rr:object unit:Meter;
+	].	
+	
+#übrige angrenzende Flächen 
+<#UrbanMapBufferRemainingAreas> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT KODE, CASE KODE WHEN 'NT15%' THEN 5 END BUFFER FROM KODE
+WHERE KODE LIKE "NT15%"  """
+	];
+    rr:subjectMap [
+        rr:template "BufferNode{BUFFER}";
+		rr:termType rr:BlankNode;
+	];
+	rr:predicateOpbjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:Buffer;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdfs:label;
+		rr:objectMap [rr:template "{BUFFER}m"; rr:termType rr:Literal;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:value;
+		rr:objectMap [rr:template "{BUFFER}"; rr:datatype xsd:integer;];
+	];
+	rr:predicateObjectMap[
+		rr:predicate qudt:unit; 
+		rr:object unit:Meter;
+	].	
+		

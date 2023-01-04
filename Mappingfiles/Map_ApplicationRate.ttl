@@ -1,0 +1,265 @@
+#### ApplicationRate ###
+# Author: Dr. Katharina Albrecht
+# Date:	  2022-08-03
+# Version: 1.1
+# Change: created own file
+#################
+
+@prefix rr: <http://www.w3.org/ns/r2rml#>.
+@prefix rml: <http://semweb.mmlab.be/ns/rml#>.
+@prefix ql: <http://semweb.mmlab.be/ns/ql#>.
+@prefix transit: <http://vocab.org/transit/terms/>.
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+@base <http://example.com/ns#>.
+@prefix psm: <http://srv.ktbl.de/data/psm/>.
+@prefix psmr: <http://srv.ktbl.de/data/psm/resources/>.
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix unit: <http://qudt.org/vocab/unit#>.
+@prefix qudt: <http://qudt.org/schema/qudt/>.
+
+@prefix d2rq : <http://www.wiwiss.fu-berlin.de/suhl/bizer/D2RQ/0.1#> .
+<#DB_source> a d2rq:Database;
+    d2rq:jdbcDSN "jdbc:sqlite:PathToDB";
+    d2rq:jdbcDriver "org.sqlite.JDBC";
+    d2rq:username "";
+	d2rq:password "".
+	
+<#TriplesMapIndicationAgent> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT KENNR, AWG_ID, REPLACE(AWG_ID, "/", "-") AS URLID FROM AWG """
+	];
+    rr:subjectMap [
+        rr:template "http://srv.ktbl.de/data/psm/resources/ind_{URLID}";
+        rr:class psm:Indication;
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:usableApplicationRate;
+		rr:objectMap [
+			rr:parentTriplesMap <#TriplesMapIndicationApplicationRate>;
+			rr:joinCondition [
+				rr:child "AWG_ID";
+				rr:parent "AWG_ID";
+			];
+		];
+
+	].	
+
+<#TriplesMapIndicationApplicationRate> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT AWG_ID, SORTIER_NR, AUFWANDBEDINGUNG, CASE length(AUFWANDBEDINGUNG) WHEN 1 THEN REPLACE(AWG_ID, "/", "-") ELSE REPLACE(AWG_ID, "/", "-") || AUFWANDBEDINGUNG END AWGURL FROM AWG_AUFWAND """
+	];
+    rr:subjectMap [
+        rr:template "ApplicationRateCondition{AWGURL}";
+        rr:termType rr:BlankNode;
+	];
+	rr:predicateObjectMap[
+		rr:predicate rdf:type;
+		rr:object psm:ApplicationRate;
+	];
+	rr:predicateObjectMap [
+        rr:predicate psm:sortingNumber;
+        rr:objectMap [ rml:reference "SORTIER_NR" ];
+
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:amountOfAgent;
+		rr:objectMap [
+			rr:parentTriplesMap <#TriplesMapAgentApplication>;
+			rr:joinCondition [
+				rr:child "AWG_ID";
+				rr:parent "AWG_ID";
+			];
+			rr:joinCondition [
+				rr:child "SORTIER_NR";
+				rr:parent "SORTIER_NR";
+			];
+		];
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:minAmountOfWater;
+		rr:objectMap [
+			rr:parentTriplesMap <#TriplesMapWaterApplication>;
+			rr:joinCondition [
+				rr:child "AWG_ID";
+				rr:parent "AWG_ID";
+			];
+			rr:joinCondition [
+				rr:child "SORTIER_NR";
+				rr:parent "SORTIER_NR";
+			];
+		];	
+	];
+	rr:predicateObjectMap [
+		rr:predicate psm:maxAmountOfWater;
+		rr:objectMap [
+			rr:parentTriplesMap <#TriplesMapWaterApplicationBIS>;
+			rr:joinCondition [
+				rr:child "AWG_ID";
+				rr:parent "AWG_ID";
+			];
+			rr:joinCondition [
+				rr:child "SORTIER_NR";
+				rr:parent "SORTIER_NR";
+			];
+		];
+	];
+	rr:predicateObjectMap [
+        rr:predicate psm:applicationCondition;
+        rr:objectMap [
+			rr:parentTriplesMap <#TriplesMapAufwandbedingungen>;
+			rr:joinCondition [
+				rr:child "AUFWANDBEDINGUNG";
+				rr:parent "KODE";
+			];
+		];		
+	].
+	
+	
+<#TriplesMapAgentApplication> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT AWG_ID, M_AUFWAND, SORTIER_NR, AUFWANDBEDINGUNG, M_AUFWAND_EINHEIT,
+		REPLACE(M_AUFWAND,",","_") || CASE M_AUFWAND_EINHEIT WHEN "%%" THEN "PERCENT" ELSE M_AUFWAND_EINHEIT END AS AUFWANDID FROM AWG_AUFWAND """
+	];
+    rr:subjectMap [
+        rr:template "http://srv.ktbl.de/data/psm/resources/ara_{AUFWANDID}";		
+		rr:termType rr:BlankNode;
+    ];	
+	rr:predicateObjectMap [
+        rr:predicate rdf:type;
+		rr:object psm:ApplicationRateAgent; 
+	];
+
+	rr:predicateObjectMap [
+        rr:predicate qudt:value;
+        rr:objectMap [ rml:reference "M_AUFWAND" ; rr:dataType xsd:double];
+	];
+
+	rr:predicateObjectMap [
+		rr:predicate qudt:unit;
+		rr:objectMap [
+			rr:parentTriplesMap <#TriplesMapAufwandseinheiten>;
+			rr:joinCondition [
+				rr:child "M_AUFWAND_EINHEIT";
+				rr:parent "KODE";
+			];
+		];
+	].		
+	
+<#TriplesMapWaterApplication> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT AWG_ID, SORTIER_NR, W_AUFWAND_VON, W_AUFWAND_EINHEIT, AUFWANDBEDINGUNG,  
+		M_AUFWAND || AUFWANDBEDINGUNG || M_AUFWAND_EINHEIT || W_AUFWAND_VON AS WAUFWANDIDVON FROM AWG_AUFWAND
+		WHERE W_AUFWAND_VON IS NOT NULL """
+	];
+    rr:subjectMap [
+        rr:template "http://srv.ktbl.de/data/psm/resources/arw_{WAUFWANDIDVON}";
+		rr:termType rr:BlankNode;
+    ];
+	rr:predicateObjectMap [
+        rr:predicate rdf:type;
+		rr:object psm:ApplicationRateWater; 
+	];	
+	rr:predicateObjectMap [
+        rr:predicate qudt:value;
+        rr:objectMap [ rml:reference "W_AUFWAND_VON" ; rr:dataType xsd:double];
+	];
+	rr:predicateObjectMap [
+		rr:predicate qudt:unit;
+		rr:objectMap [
+			rr:parentTriplesMap <#TriplesMapAufwandseinheiten>;
+			rr:joinCondition [
+				rr:child "W_AUFWAND_EINHEIT";
+				rr:parent "KODE";
+			];
+		];
+	].		
+		
+
+<#TriplesMapWaterApplicationBIS> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT DISTINCT AWG_ID, SORTIER_NR,  W_AUFWAND_BIS, W_AUFWAND_EINHEIT, AUFWANDBEDINGUNG, 
+		CASE  length(AUFWANDBEDINGUNG) 
+			WHEN 1 THEN REPLACE(M_AUFWAND,'.','_') || M_AUFWAND_EINHEIT || W_AUFWAND_BIS 
+			ELSE REPLACE(M_AUFWAND,'.','_')	|| AUFWANDBEDINGUNG || M_AUFWAND_EINHEIT || W_AUFWAND_BIS  
+		END WAUFWANDIDBIS 
+		FROM AWG_AUFWAND
+		WHERE W_AUFWAND_BIS IS NOT NULL """
+	];
+    rr:subjectMap [
+        rr:template "http://srv.ktbl.de/data/psm/resources/arw_{WAUFWANDIDBIS}";
+		rr:termType rr:BlankNode;
+    ];	
+	rr:predicateObjectMap [
+        rr:predicate rdf:type;
+		rr:object psm:ApplicationRateWater; 
+	];
+	rr:predicateObjectMap [
+        rr:predicate qudt:value;
+        rr:objectMap [ rml:reference "W_AUFWAND_BIS"; rr:dataType xsd:double ];
+	];
+	rr:predicateObjectMap [
+		rr:predicate qudt:unit;
+		rr:objectMap [
+			rr:parentTriplesMap <#TriplesMapAufwandseinheiten>;
+			rr:joinCondition [
+				rr:child "W_AUFWAND_EINHEIT";
+				rr:parent "KODE";
+			];
+		];	
+	].		
+	
+
+<#TriplesMapAufwandseinheiten> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT KODE, KODETEXT FROM KODE
+					WHERE KODELISTE = 25 AND SPRACHE = "DE" """
+	];
+    rr:subjectMap [
+        rr:template "http://srv.ktbl.de/data/psm/resources/au_{KODE}";
+		rr:class psm:ApplicationUnit;
+	];
+	rr:predicateObjectMap [
+        rr:predicate qudt:abbreviation;
+        rr:objectMap [ rml:reference "KODETEXT" ];
+	];
+	rr:predicateObjectMap [
+        rr:predicate rdfs:label;
+        rr:objectMap [ rml:reference "KODETEXT"; rr:language "de"];
+    ].	
+	
+<#TriplesMapAufwandbedingungen> a rr:TriplesMap;
+    rml:logicalSource [
+		rml:source <#DB_source> ;
+		rr:sqlVersion rr:SQL2008;
+		rml:referenceFormulation ql:CSV;
+		rml:query """ SELECT * FROM KODE
+					WHERE KODELISTE = 28 AND SPRACHE = "DE" """
+	];
+    rr:subjectMap [
+        rr:template "http://srv.ktbl.de/data/psm/resources/ac_{KODE}";
+		rr:class psm:ApplicationCondition;
+	];
+	rr:predicateObjectMap [
+        rr:predicate rdfs:label;
+        rr:objectMap [ rml:reference "KODETEXT"; rr:language "de" ];
+    ].	
+	
