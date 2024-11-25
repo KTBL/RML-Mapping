@@ -1,7 +1,7 @@
 # RML-Mapping
 This repository contains Mappingfiles for [rmlmapper-java](https://github.com/RMLio/rmlmapper-java)
 
-Note: SQLite and Access DB Sources are not supported by rmlmapper-java yet. However, find a forked and adapted version inside the [KTBL Repository](https://github.com/KTBL/rmlmapper-java)
+Note: To use the Mappings on SQL and Access, I forked and adapted the rmlmapper-java: [KTBL Repository](https://github.com/KTBL/rmlmapper-java)
 
 ## DB Source 
 
